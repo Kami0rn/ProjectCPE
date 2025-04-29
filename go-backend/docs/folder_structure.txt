@@ -1,0 +1,44 @@
+go-backend/
+│
+├── main.go
+├── go.mod
+├── go.sum
+│
+├── config/                     # App config (env, DB, ports, etc.)
+│   └── config.go
+│
+├── models/                     # GORM models
+│   ├── user.go
+│   ├── block.go                # Blockchain block model
+│   ├── transaction.go
+│   └── model_log.go            # WGAN model tracking
+│
+├── controllers/               # API handlers
+│   ├── auth_controller.go
+│   ├── block_controller.go     # Blockchain logic endpoints
+│   └── model_controller.go     # AI training/result submission
+│
+├── routes/                     # Gin route binding
+│   └── router.go
+│
+├── database/                   # PostgreSQL setup
+│   └── postgres.go
+│
+├── blockchain/                 # Blockchain core logic (mining, consensus)
+│   ├── block.go
+│   ├── chain.go
+│   └── proof_of_training.go    # Your custom PoUT logic
+│
+├── middleware/                 # CORS, JWT auth, etc.
+│   └── auth.go
+│
+├── utils/                      # Helper tools
+│   ├── jwt.go
+│   ├── hash.go
+│   └── ai_rpc.go               # If connecting to Python AI server
+│
+├── ai-client/                  # (optional) GRPC or HTTP client to Python AI
+│   └── client.go
+│
+├── docs/
+└── README.md
