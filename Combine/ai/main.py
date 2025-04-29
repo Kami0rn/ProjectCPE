@@ -1,0 +1,181 @@
+import os
+import torch
+from torchvision import transforms
+from torch.utils.data import DataLoader, Dataset
+from PIL import Image
+import matplotlib.pyplot as plt
+import torchvision
+import torch.nn as nn
+import torch.optim as optim
+from flask import Flask, request, jsonify
+from werkzeug.utils import secure_filename
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Flask app initialization
+app = Flask(__name__)
+UPLOAD_FOLDER = 'uploaded_images'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# -------------------------------
+#   DCGAN Generator (Modified)
+# -------------------------------
+class DCGANGenerator(nn.Module):
+    def __init__(self, latent_dim=100, img_channels=3, feature_g=64):
+        super(DCGANGenerator, self).__init__()
+        self.net = nn.Sequential(
+            nn.ConvTranspose2d(latent_dim, feature_g * 8, 4, 1, 0, bias=False),
+            nn.BatchNorm2d(feature_g * 8),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(feature_g * 8, feature_g * 4, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(feature_g * 4),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(feature_g * 4, feature_g * 2, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(feature_g * 2),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(feature_g * 2, feature_g, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(feature_g),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(feature_g, img_channels, 4, 2, 1, bias=False),
+            nn.Tanh()
+        )
+
+    def forward(self, z):
+        return self.net(z)
+
+# -------------------------------
+#   WGAN-GP Discriminator (Critic)
+# -------------------------------
+class WGANDiscriminator(nn.Module):
+    def __init__(self, img_channels=3, feature_d=64):
+        super(WGANDiscriminator, self).__init__()
+        self.net = nn.Sequential(
+            nn.Conv2d(img_channels, feature_d, 4, 2, 1, bias=False),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(feature_d, feature_d * 2, 4, 2, 1, bias=False),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(feature_d * 2, feature_d * 4, 4, 2, 1, bias=False),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(feature_d * 4, feature_d * 8, 4, 2, 1, bias=False),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(feature_d * 8, 1, 4, 1, 0, bias=False),
+        )
+
+    def forward(self, x):
+        return self.net(x).view(-1)
+
+# -------------------------------
+#   Custom Dataset
+# -------------------------------
+class CustomImageDataset(Dataset):
+    def __init__(self, img_dir, transform=None):
+        self.img_dir = img_dir
+        self.transform = transform
+        self.img_paths = [os.path.join(img_dir, img_name) for img_name in os.listdir(img_dir) if os.path.isfile(os.path.join(img_dir, img_name))]
+
+    def __len__(self):
+        return len(self.img_paths)
+
+    def __getitem__(self, idx):
+        image = Image.open(self.img_paths[idx]).convert("RGB")
+        if self.transform:
+            image = self.transform(image)
+        return image, 0
+
+# -------------------------------
+#   REST API Endpoint
+# -------------------------------
+@app.route('/train', methods=['POST'])
+def train_model():
+    # Clear the upload folder
+    for file in os.listdir(app.config['UPLOAD_FOLDER']):
+        os.remove(os.path.join(app.config['UPLOAD_FOLDER'], file))
+
+    # Save uploaded images
+    if 'images' not in request.files:
+        return jsonify({'error': 'No images provided'}), 400
+
+    images = request.files.getlist('images')
+    for img in images:
+        filename = secure_filename(img.filename)
+        img.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+
+    # Get the number of epochs from the request
+    epochs = request.form.get('epochs', type=int, default=100)
+
+    # Transform and dataset
+    transform = transforms.Compose([
+        transforms.Resize((64, 64)),
+        transforms.ToTensor(),
+        transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+    ])
+    dataset = CustomImageDataset(img_dir=app.config['UPLOAD_FOLDER'], transform=transform)
+    dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
+
+    # Initialize models
+    generator = DCGANGenerator(latent_dim=100).to(device)
+    discriminator = WGANDiscriminator().to(device)
+
+    # Apply weight initialization
+    generator.apply(weights_init)
+    discriminator.apply(weights_init)
+
+    # Optimizers
+    optimizer_G = optim.Adam(generator.parameters(), lr=0.0001, betas=(0.5, 0.9))
+    optimizer_D = optim.Adam(discriminator.parameters(), lr=0.0001, betas=(0.5, 0.9))
+
+    # Training loop
+    for epoch in range(epochs):
+        for i, (imgs, _) in enumerate(dataloader):
+            real_imgs = imgs.to(device)
+            batch_size_now = real_imgs.size(0)
+
+            # Train Discriminator
+            optimizer_D.zero_grad()
+            z = torch.randn(batch_size_now, 100, 1, 1, device=device)
+            fake_imgs = generator(z).detach()
+            real_validity = discriminator(real_imgs)
+            fake_validity = discriminator(fake_imgs)
+            gradient_penalty = compute_gradient_penalty(discriminator, real_imgs.data, fake_imgs.data)
+            loss_D = -torch.mean(real_validity) + torch.mean(fake_validity) + 10 * gradient_penalty
+            loss_D.backward()
+            optimizer_D.step()
+
+            # Train Generator
+            if i % 5 == 0:
+                optimizer_G.zero_grad()
+                z = torch.randn(batch_size_now, 100, 1, 1, device=device)
+                gen_imgs = generator(z)
+                loss_G = -torch.mean(discriminator(gen_imgs))
+                loss_G.backward()
+                optimizer_G.step()
+
+        print(f"[Epoch {epoch}/{epochs}] [D loss: {loss_D.item():.4f}] [G loss: {loss_G.item():.4f}]")
+
+    return jsonify({'message': 'Training complete', 'epochs': epochs})
+
+# -------------------------------
+#   Gradient Penalty
+# -------------------------------
+def compute_gradient_penalty(D, real_samples, fake_samples):
+    alpha = torch.rand((real_samples.size(0), 1, 1, 1), device=device, requires_grad=True)
+    interpolates = (alpha * real_samples + (1 - alpha) * fake_samples).requires_grad_(True)
+    d_interpolates = D(interpolates)
+    gradients = torch.autograd.grad(
+        outputs=d_interpolates,
+        inputs=interpolates,
+        grad_outputs=torch.ones_like(d_interpolates),
+        create_graph=True,
+        retain_graph=True,
+        only_inputs=True
+    )[0]
+    gradients = gradients.view(gradients.size(0), -1)
+    gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
+    return gradient_penalty
+
+# -------------------------------
+#   Run Flask App
+# -------------------------------
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)

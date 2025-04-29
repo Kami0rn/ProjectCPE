@@ -1,0 +1,47 @@
+func (chain *UTXOSet) FindUnspentTransactions(pubKeyHash []byte) []TxOutput {
+	var UTXOs []TxOutput
+
+	spenTX0s := make(map[string][]int)
+
+	iter := chain.Iterator()
+
+	for {
+		block := iter.Next()
+
+		for _, tx := range block.Transactions {
+			txID := hex.EncodeToString(tx.ID)
+
+		Outputs:
+			for outIdx, out := range tx.Outputs {
+				if spenTX0s[txID] != nil {
+					for _, spentOut := range spenTX0s[txID] {
+						if spentOut == outIdx {
+							continue Outputs
+						}
+					}
+				}
+				if out.IsLockedWithKey(pubKeyHash) {
+					UTXOs = append(UTXOs, *tx)
+				}
+			}
+
+			if tx.IsCoinbase() == false {
+				for _, in := range tx.Inputs {
+					if in.UsesKey(pubKeyHash) {
+						inTxID := hex.EncodeToString(in.ID)
+						spenTX0s[inTxID] = append(spenTX0s[inTxID], in.Out)
+					}
+				}
+			}
+		}
+
+		if len(block.PrevHash) == 0 {
+			break
+		}
+	}
+
+	return UTXOs
+}
+
+
+lorem
