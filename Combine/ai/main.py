@@ -18,6 +18,14 @@ UPLOAD_FOLDER = 'uploaded_images'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# Define folders for saving samples and models
+SAMPLES_FOLDER = 'generated_samples'
+MODELS_FOLDER = 'saved_models'
+
+# Ensure the folders exist
+os.makedirs(SAMPLES_FOLDER, exist_ok=True)
+os.makedirs(MODELS_FOLDER, exist_ok=True)
+
 # -------------------------------
 #   DCGAN Generator (Modified)
 # -------------------------------
@@ -153,7 +161,25 @@ def train_model():
 
         print(f"[Epoch {epoch}/{epochs}] [D loss: {loss_D.item():.4f}] [G loss: {loss_G.item():.4f}]")
 
-    return jsonify({'message': 'Training complete', 'epochs': epochs})
+        # Save generated samples every 10 epochs
+        if epoch % 10 == 0:
+            z = torch.randn(16, 100, 1, 1, device=device)  # Generate 16 samples
+            sample_imgs = generator(z).detach().cpu()
+            grid = torchvision.utils.make_grid(sample_imgs, normalize=True, nrow=4)
+            save_path = os.path.join(SAMPLES_FOLDER, f'samples_epoch_{epoch}.png')
+            torchvision.utils.save_image(grid, save_path)
+            print(f"Saved generated samples to {save_path}")
+
+    # Save the trained models
+    torch.save(generator.state_dict(), os.path.join(MODELS_FOLDER, 'generator.pth'))
+    torch.save(discriminator.state_dict(), os.path.join(MODELS_FOLDER, 'discriminator.pth'))
+
+    return jsonify({
+        'message': 'Training complete',
+        'epochs': epochs,
+        'generator_model': os.path.join(MODELS_FOLDER, 'generator.pth'),
+        'discriminator_model': os.path.join(MODELS_FOLDER, 'discriminator.pth')
+    })
 
 # -------------------------------
 #   Gradient Penalty
@@ -173,6 +199,17 @@ def compute_gradient_penalty(D, real_samples, fake_samples):
     gradients = gradients.view(gradients.size(0), -1)
     gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
     return gradient_penalty
+
+# -------------------------------
+#   Weight Initialization
+# -------------------------------
+def weights_init(m):
+    classname = m.__class__.__name__
+    if classname.find('Conv') != -1:
+        nn.init.normal_(m.weight.data, 0.0, 0.02)
+    elif classname.find('BatchNorm') != -1:
+        nn.init.normal_(m.weight.data, 1.0, 0.02)
+        nn.init.constant_(m.bias.data, 0)
 
 # -------------------------------
 #   Run Flask App
