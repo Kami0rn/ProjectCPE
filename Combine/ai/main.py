@@ -97,15 +97,31 @@ class CustomImageDataset(Dataset):
 # -------------------------------
 @app.route('/train', methods=['POST'])
 def train_model():
+    import shutil
+
     # Clear the upload folder
-    for file in os.listdir(app.config['UPLOAD_FOLDER']):
-        os.remove(os.path.join(app.config['UPLOAD_FOLDER'], file))
+    if os.path.exists(app.config['UPLOAD_FOLDER']):
+        shutil.rmtree(app.config['UPLOAD_FOLDER'])
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+    # Clear the generated samples folder
+    if os.path.exists(SAMPLES_FOLDER):
+        shutil.rmtree(SAMPLES_FOLDER)
+    os.makedirs(SAMPLES_FOLDER, exist_ok=True)
+
+    # Clear the saved models folder
+    if os.path.exists(MODELS_FOLDER):
+        shutil.rmtree(MODELS_FOLDER)
+    os.makedirs(MODELS_FOLDER, exist_ok=True)
 
     # Save uploaded images
     if 'images' not in request.files:
         return jsonify({'error': 'No images provided'}), 400
 
     images = request.files.getlist('images')
+    if len(images) == 0:
+        return jsonify({'error': 'No images provided'}), 400
+
     for img in images:
         filename = secure_filename(img.filename)
         img.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))

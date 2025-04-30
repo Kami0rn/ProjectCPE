@@ -33,9 +33,16 @@ func AddTransaction(c *gin.Context) {
 // Mine a new block
 func MineBlock(c *gin.Context) {
 	// Parse the multipart form data
-	file, err := c.FormFile("images")
+	form, err := c.MultipartForm()
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to get image file"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse form data"})
+		return
+	}
+
+	// Retrieve all uploaded files
+	files := form.File["images"]
+	if len(files) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No images provided"})
 		return
 	}
 
@@ -45,22 +52,28 @@ func MineBlock(c *gin.Context) {
 		return
 	}
 
-	// Save the uploaded file temporarily
-	tempFilePath := "./temp_image.jpg"
-	if err := c.SaveUploadedFile(file, tempFilePath); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save image file"})
-		return
+	// Save all uploaded files temporarily
+	tempFilePaths := []string{}
+	for _, file := range files {
+		tempFilePath := "./" + file.Filename
+		if err := c.SaveUploadedFile(file, tempFilePath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save image file"})
+			return
+		}
+		tempFilePaths = append(tempFilePaths, tempFilePath)
 	}
 
 	// Request AI proof from the Python module
-	aiProof, err := blockchain.RequestAIProof(tempFilePath, epochs)
+	aiProof, err := blockchain.RequestAIProof(tempFilePaths, epochs)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get AI proof"})
 		return
 	}
 
-	// Clean up the temporary file
-	defer os.Remove(tempFilePath)
+	// Clean up the temporary files
+	for _, tempFilePath := range tempFilePaths {
+		os.Remove(tempFilePath)
+	}
 
 	// Get the last block in the blockchain
 	lastBlock := blockchain.Blockchain[len(blockchain.Blockchain)-1]

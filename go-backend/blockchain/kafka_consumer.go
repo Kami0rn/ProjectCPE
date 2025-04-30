@@ -10,27 +10,29 @@ import (
 )
 
 // RequestAIProof communicates with the Python AI module via REST API
-func RequestAIProof(filePath string, epochs string) (string, error) {
+func RequestAIProof(filePaths []string, epochs string) (string, error) {
 	url := "http://localhost:5000/train" // Python AI module endpoint
 
 	// Create a buffer to hold the multipart form data
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 
-	// Add the file to the form
-	file, err := os.Open(filePath)
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
+	// Add all files to the form
+	for _, filePath := range filePaths {
+		file, err := os.Open(filePath)
+		if err != nil {
+			return "", err
+		}
+		defer file.Close()
 
-	part, err := writer.CreateFormFile("images", file.Name())
-	if err != nil {
-		return "", err
-	}
-	_, err = io.Copy(part, file)
-	if err != nil {
-		return "", err
+		part, err := writer.CreateFormFile("images", file.Name())
+		if err != nil {
+			return "", err
+		}
+		_, err = io.Copy(part, file)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	// Add the epochs to the form
