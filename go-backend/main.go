@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 
+	"github.com/Kami0rn/ProjectCPE/go-backend/blockchain"
 	"github.com/Kami0rn/ProjectCPE/go-backend/config"
 	"github.com/Kami0rn/ProjectCPE/go-backend/database"
 	"github.com/Kami0rn/ProjectCPE/go-backend/routes"
@@ -19,6 +20,12 @@ func main() {
 	config.LoadEnv()
 	database.ConnectDB()
 
+	// Initialize the genesis block
+	blockchain.InitGenesisBlock()
+
+	// Start the Gin HTTP server
 	r := routes.SetupRouter()
-	r.Run(":8080")
+	if err := r.Run(":8080"); err != nil {
+		log.Fatalf("Failed to start server: %v", err)
+	}
 }

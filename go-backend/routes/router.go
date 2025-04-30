@@ -23,6 +23,7 @@ func SetupRouter() *gin.Engine {
 		api.GET("/chain",handlers.GetChain)
 		api.POST("/transaction",handlers.AddTransaction)
 		api.POST("/mine",handlers.MineBlock)
+		api.GET("/me", controllers.Me)
 	}
 
 	return r

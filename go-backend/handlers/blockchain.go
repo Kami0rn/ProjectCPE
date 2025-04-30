@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/Kami0rn/ProjectCPE/go-backend/blockchain"
@@ -29,19 +30,58 @@ func AddTransaction(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Transaction added"})
 }
 
-// Mine a new block (simulate work for now)
+// Mine a new block
 func MineBlock(c *gin.Context) {
+	// Parse the multipart form data
+	file, err := c.FormFile("images")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to get image file"})
+		return
+	}
+
+	epochs := c.PostForm("epochs")
+	if epochs == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Epochs parameter is required"})
+		return
+	}
+
+	// Save the uploaded file temporarily
+	tempFilePath := "./temp_image.jpg"
+	if err := c.SaveUploadedFile(file, tempFilePath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save image file"})
+		return
+	}
+
+	// Request AI proof from the Python module
+	aiProof, err := blockchain.RequestAIProof(tempFilePath, epochs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get AI proof"})
+		return
+	}
+
+	// Clean up the temporary file
+	defer os.Remove(tempFilePath)
+
+	// Get the last block in the blockchain
 	lastBlock := blockchain.Blockchain[len(blockchain.Blockchain)-1]
 
+	// Create a new block
 	newBlock := blockchain.Block{
 		Index:        lastBlock.Index + 1,
 		Timestamp:    time.Now(),
 		Transactions: pendingTransactions,
 		PrevHash:     lastBlock.Hash,
-		Proof:        "simulated_proof", // later will be WGAN proof
+		Proof:        aiProof,
 	}
 	newBlock.Hash = blockchain.CalculateHash(newBlock)
 
+	// Validate the new block
+	if !blockchain.IsBlockValid(newBlock, lastBlock) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid block"})
+		return
+	}
+
+	// Add the new block to the blockchain
 	blockchain.AddBlock(newBlock)
 	pendingTransactions = nil
 

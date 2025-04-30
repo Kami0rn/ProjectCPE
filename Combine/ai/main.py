@@ -6,6 +6,7 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import torchvision
 import torch.nn as nn
+import hashlib
 import torch.optim as optim
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
@@ -174,12 +175,26 @@ def train_model():
     torch.save(generator.state_dict(), os.path.join(MODELS_FOLDER, 'generator.pth'))
     torch.save(discriminator.state_dict(), os.path.join(MODELS_FOLDER, 'discriminator.pth'))
 
+    # Generate AI proof using the generated images (e.g., hash of the first sample image)
+    ai_proof = generate_ai_proof(generator)
+
     return jsonify({
         'message': 'Training complete',
         'epochs': epochs,
         'generator_model': os.path.join(MODELS_FOLDER, 'generator.pth'),
-        'discriminator_model': os.path.join(MODELS_FOLDER, 'discriminator.pth')
+        'discriminator_model': os.path.join(MODELS_FOLDER, 'discriminator.pth'),
+        'ai_proof': ai_proof
     })
+    
+def generate_ai_proof(generator):
+    # Generate a sample image (for proof generation)
+    z = torch.randn(1, 100, 1, 1, device=device)  # Latent vector for 1 sample
+    generated_img = generator(z).detach().cpu()
+    
+    # Convert to a byte array and hash the image (for unique proof)
+    img = generated_img.squeeze(0).permute(1, 2, 0).numpy()  # Convert to HxWxC
+    img_hash = hashlib.sha256(img.tobytes()).hexdigest()  # Create a SHA-256 hash for proof
+    return img_hash
 
 # -------------------------------
 #   Gradient Penalty

@@ -3,6 +3,7 @@ go-backend/
 ├── main.go
 ├── go.mod
 ├── go.sum
+├── .env
 │
 ├── config/                     # App config (env, DB, ports, etc.)
 │   └── config.go
@@ -26,8 +27,9 @@ go-backend/
 │
 ├── blockchain/                 # Blockchain core logic (mining, consensus)
 │   ├── block.go
-│   ├── chain.go
-│   └── proof_of_training.go    # Your custom PoUT logic
+│   ├── transaction.go
+|   ├── blockchain.go
+│   └── utils.go    # Your custom PoUT logic
 │
 ├── middleware/                 # CORS, JWT auth, etc.
 │   └── auth.go
