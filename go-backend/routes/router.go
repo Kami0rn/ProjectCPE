@@ -11,7 +11,7 @@ func SetupRouter() *gin.Engine {
 	r := gin.Default()
 
 	auth := r.Group("/auth")
-	
+
 	{
 		auth.POST("/register", controllers.Register)
 		auth.POST("/login", controllers.Login)
@@ -20,10 +20,11 @@ func SetupRouter() *gin.Engine {
 	api := r.Group("/api")
 	api.Use(middleware.JWTAuthMiddleware())
 	{
-		api.GET("/chain",handlers.GetChain)
-		api.POST("/transaction",handlers.AddTransaction)
-		api.POST("/mine",handlers.MineBlock)
+		api.GET("/chain", handlers.GetChain)
+		api.POST("/transaction", handlers.AddTransaction)
+		api.POST("/mine", handlers.MineBlock)
 		api.GET("/me", controllers.Me)
+		api.POST("/check-image", handlers.CheckImage) // New endpoint
 	}
 
 	return r

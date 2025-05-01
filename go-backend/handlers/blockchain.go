@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -19,6 +22,21 @@ func GetChain(c *gin.Context) {
 		"length": len(blockchain.Blockchain),
 		"chain":  blockchain.Blockchain,
 	})
+}
+
+func hashFile(filePath string) (string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	hasher := sha256.New()
+	if _, err := io.Copy(hasher, file); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
 // Add a transaction to the pending pool
@@ -106,6 +124,24 @@ func MineBlock(c *gin.Context) {
 		tempFilePaths = append(tempFilePaths, tempFilePath)
 	}
 
+	// Compute the hash of each uploaded image and add it as a transaction
+	for _, filePath := range tempFilePaths {
+		hash, err := hashFile(filePath)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash image file"})
+			return
+		}
+
+		// Add the hash as a transaction
+		tx := blockchain.Transaction{
+			Sender:    username,
+			Receiver:  "blockchain",
+			Amount:    0, // No monetary value, just storing the hash
+			ImageHash: hash,
+		}
+		pendingTransactions = append(pendingTransactions, tx)
+	}
+
 	// Request AI proof from the Python module
 	aiProof, err := blockchain.RequestAIProof(tempFilePaths, epochs, username, modelName)
 	if err != nil {
@@ -137,4 +173,53 @@ func MineBlock(c *gin.Context) {
 	pendingTransactions = nil
 
 	c.JSON(http.StatusCreated, newBlock)
+}
+
+func CheckImage(c *gin.Context) {
+	// Parse the uploaded image
+	file, err := c.FormFile("image")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No image provided"})
+		return
+	}
+
+	// Save the uploaded image temporarily
+	tempFilePath := "./temp_uploaded_image"
+	if err := c.SaveUploadedFile(file, tempFilePath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save image"})
+		return
+	}
+	defer os.Remove(tempFilePath) // Clean up the temporary file
+
+	// Compute the hash of the uploaded image
+	imageHash, err := hashFile(tempFilePath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to compute image hash"})
+		return
+	}
+
+	// Collect all matches for the image hash
+	matches := []gin.H{}
+	for _, block := range blockchain.Blockchain {
+		for _, tx := range block.Transactions {
+			if tx.ImageHash == imageHash {
+				matches = append(matches, gin.H{
+					"block_index": block.Index,
+					"timestamp":   block.Timestamp,
+				})
+			}
+		}
+	}
+
+	// Return the results
+	if len(matches) > 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"trained": true,
+			"matches": matches,
+		})
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"trained": false,
+		})
+	}
 }
