@@ -10,8 +10,8 @@ import (
 )
 
 // RequestAIProof communicates with the Python AI module via REST API
-func RequestAIProof(filePaths []string, epochs string) (string, error) {
-	url := "http://localhost:5000/train" // Python AI module endpoint
+func RequestAIProof(filePaths []string, epochs, username, modelName string) (string, error) {
+	url := "http://localhost:5000/train"
 
 	// Create a buffer to hold the multipart form data
 	body := &bytes.Buffer{}
@@ -35,8 +35,14 @@ func RequestAIProof(filePaths []string, epochs string) (string, error) {
 		}
 	}
 
-	// Add the epochs to the form
+	// Add the epochs, username, and model_name to the form
 	if err := writer.WriteField("epochs", epochs); err != nil {
+		return "", err
+	}
+	if err := writer.WriteField("username", username); err != nil {
+		return "", err
+	}
+	if err := writer.WriteField("model_name", modelName); err != nil {
 		return "", err
 	}
 

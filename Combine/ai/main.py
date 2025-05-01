@@ -99,20 +99,23 @@ class CustomImageDataset(Dataset):
 def train_model():
     import shutil
 
-    # Clear the upload folder
-    if os.path.exists(app.config['UPLOAD_FOLDER']):
-        shutil.rmtree(app.config['UPLOAD_FOLDER'])
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    # Get username and model_name from the request
+    username = request.form.get('username')
+    model_name = request.form.get('model_name')
+    if not username or not model_name:
+        return jsonify({'error': 'Username and model_name are required'}), 400
 
-    # Clear the generated samples folder
-    if os.path.exists(SAMPLES_FOLDER):
-        shutil.rmtree(SAMPLES_FOLDER)
-    os.makedirs(SAMPLES_FOLDER, exist_ok=True)
+    # Define user-specific folders under /user_data
+    base_path = os.path.join('user_data', username, model_name)
+    upload_folder = os.path.join(base_path, 'uploaded_images')
+    samples_folder = os.path.join(base_path, 'generated_samples')
+    models_folder = os.path.join(base_path, 'saved_models')
 
-    # Clear the saved models folder
-    if os.path.exists(MODELS_FOLDER):
-        shutil.rmtree(MODELS_FOLDER)
-    os.makedirs(MODELS_FOLDER, exist_ok=True)
+    # Clear and recreate the folders
+    for folder in [upload_folder, samples_folder, models_folder]:
+        if os.path.exists(folder):
+            shutil.rmtree(folder)
+        os.makedirs(folder, exist_ok=True)
 
     # Save uploaded images
     if 'images' not in request.files:
@@ -124,7 +127,7 @@ def train_model():
 
     for img in images:
         filename = secure_filename(img.filename)
-        img.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        img.save(os.path.join(upload_folder, filename))
 
     # Get the number of epochs from the request
     epochs = request.form.get('epochs', type=int, default=100)
@@ -135,7 +138,7 @@ def train_model():
         transforms.ToTensor(),
         transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
     ])
-    dataset = CustomImageDataset(img_dir=app.config['UPLOAD_FOLDER'], transform=transform)
+    dataset = CustomImageDataset(img_dir=upload_folder, transform=transform)
     dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
 
     # Initialize models
@@ -183,13 +186,13 @@ def train_model():
             z = torch.randn(16, 100, 1, 1, device=device)  # Generate 16 samples
             sample_imgs = generator(z).detach().cpu()
             grid = torchvision.utils.make_grid(sample_imgs, normalize=True, nrow=4)
-            save_path = os.path.join(SAMPLES_FOLDER, f'samples_epoch_{epoch}.png')
+            save_path = os.path.join(samples_folder, f'samples_epoch_{epoch}.png')
             torchvision.utils.save_image(grid, save_path)
             print(f"Saved generated samples to {save_path}")
 
     # Save the trained models
-    torch.save(generator.state_dict(), os.path.join(MODELS_FOLDER, 'generator.pth'))
-    torch.save(discriminator.state_dict(), os.path.join(MODELS_FOLDER, 'discriminator.pth'))
+    torch.save(generator.state_dict(), os.path.join(models_folder, 'generator.pth'))
+    torch.save(discriminator.state_dict(), os.path.join(models_folder, 'discriminator.pth'))
 
     # Generate AI proof using the generated images (e.g., hash of the first sample image)
     ai_proof = generate_ai_proof(generator)
@@ -197,8 +200,8 @@ def train_model():
     return jsonify({
         'message': 'Training complete',
         'epochs': epochs,
-        'generator_model': os.path.join(MODELS_FOLDER, 'generator.pth'),
-        'discriminator_model': os.path.join(MODELS_FOLDER, 'discriminator.pth'),
+        'generator_model': os.path.join(models_folder, 'generator.pth'),
+        'discriminator_model': os.path.join(models_folder, 'discriminator.pth'),
         'ai_proof': ai_proof
     })
     

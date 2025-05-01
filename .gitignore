@@ -1,3 +1,6 @@
 Combine/ai/generated_samples
 Combine/ai/saved_models
 Combine/ai/uploaded_images
+Combine/ai/user_data
+
+go-backend/user_data

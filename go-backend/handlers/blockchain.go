@@ -3,9 +3,11 @@ package handlers
 import (
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/Kami0rn/ProjectCPE/go-backend/blockchain"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 )
 
@@ -32,6 +34,34 @@ func AddTransaction(c *gin.Context) {
 
 // Mine a new block
 func MineBlock(c *gin.Context) {
+	// Extract the token from the Authorization header
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization token is required"})
+		return
+	}
+
+	// Remove the "Bearer " prefix from the token string
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+	tokenString = strings.TrimSpace(tokenString)
+
+	// Parse and validate the token
+	claims := jwt.MapClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(os.Getenv("JWT_SECRET")), nil
+	})
+	if err != nil || !token.Valid {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+		return
+	}
+
+	// Extract the username from the token claims
+	username, ok := claims["username"].(string)
+	if !ok || username == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token: username not found"})
+		return
+	}
+
 	// Parse the multipart form data
 	form, err := c.MultipartForm()
 	if err != nil {
@@ -46,16 +76,29 @@ func MineBlock(c *gin.Context) {
 		return
 	}
 
+	// Retrieve model_name
+	modelName := c.PostForm("model_name")
+	if modelName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Model name is required"})
+		return
+	}
+
 	epochs := c.PostForm("epochs")
 	if epochs == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Epochs parameter is required"})
 		return
 	}
 
-	// Save all uploaded files temporarily
+	// Save all uploaded files temporarily in the user's folder structure
+	basePath := "./user_data/" + username + "/" + modelName + "/uploaded_images"
+	if err := os.MkdirAll(basePath, os.ModePerm); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create directories"})
+		return
+	}
+
 	tempFilePaths := []string{}
 	for _, file := range files {
-		tempFilePath := "./" + file.Filename
+		tempFilePath := basePath + "/" + file.Filename
 		if err := c.SaveUploadedFile(file, tempFilePath); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save image file"})
 			return
@@ -64,15 +107,10 @@ func MineBlock(c *gin.Context) {
 	}
 
 	// Request AI proof from the Python module
-	aiProof, err := blockchain.RequestAIProof(tempFilePaths, epochs)
+	aiProof, err := blockchain.RequestAIProof(tempFilePaths, epochs, username, modelName)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get AI proof"})
 		return
-	}
-
-	// Clean up the temporary files
-	for _, tempFilePath := range tempFilePaths {
-		os.Remove(tempFilePath)
 	}
 
 	// Get the last block in the blockchain
