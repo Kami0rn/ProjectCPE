@@ -127,9 +127,9 @@ optimizer_D = optim.Adam(discriminator.parameters(), lr=lr, betas=(0.5, 0.9))
 # -------------------------------
 #   Directories for saving
 # -------------------------------
-save_dir_images = 'set9'
-save_dir_models = 'model_checkpoints9'
-save_dir_loss = 'plot_loss_9'
+save_dir_images = 'set10'
+save_dir_models = 'model_checkpoints10'
+save_dir_loss = 'plot_loss_10'
 os.makedirs(save_dir_images, exist_ok=True)
 os.makedirs(save_dir_models, exist_ok=True)
 os.makedirs(save_dir_loss, exist_ok=True)

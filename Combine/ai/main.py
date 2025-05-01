@@ -28,7 +28,7 @@ os.makedirs(SAMPLES_FOLDER, exist_ok=True)
 os.makedirs(MODELS_FOLDER, exist_ok=True)
 
 # -------------------------------
-#   DCGAN Generator (Modified)
+#   DCGAN Generator
 # -------------------------------
 class DCGANGenerator(nn.Module):
     def __init__(self, latent_dim=100, img_channels=3, feature_g=64):
@@ -54,7 +54,7 @@ class DCGANGenerator(nn.Module):
         return self.net(z)
 
 # -------------------------------
-#   WGAN-GP Discriminator (Critic)
+#   WGAN-GP Discriminator
 # -------------------------------
 class WGANDiscriminator(nn.Module):
     def __init__(self, img_channels=3, feature_d=64):
@@ -129,8 +129,13 @@ def train_model():
         filename = secure_filename(img.filename)
         img.save(os.path.join(upload_folder, filename))
 
-    # Get the number of epochs from the request
+    # Get hyperparameters from the request
     epochs = request.form.get('epochs', type=int, default=100)
+    latent_dim = request.form.get('latent_dim', type=int, default=100)
+    batch_size = request.form.get('batch_size', type=int, default=64)
+    lr = request.form.get('lr', type=float, default=0.0001)
+    n_critic = request.form.get('n_critic', type=int, default=5)
+    lambda_gp = request.form.get('lambda_gp', type=float, default=10)
 
     # Transform and dataset
     transform = transforms.Compose([
@@ -139,10 +144,10 @@ def train_model():
         transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
     ])
     dataset = CustomImageDataset(img_dir=upload_folder, transform=transform)
-    dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     # Initialize models
-    generator = DCGANGenerator(latent_dim=100).to(device)
+    generator = DCGANGenerator(latent_dim=latent_dim).to(device)
     discriminator = WGANDiscriminator().to(device)
 
     # Apply weight initialization
@@ -150,8 +155,8 @@ def train_model():
     discriminator.apply(weights_init)
 
     # Optimizers
-    optimizer_G = optim.Adam(generator.parameters(), lr=0.0001, betas=(0.5, 0.9))
-    optimizer_D = optim.Adam(discriminator.parameters(), lr=0.0001, betas=(0.5, 0.9))
+    optimizer_G = optim.Adam(generator.parameters(), lr=lr, betas=(0.5, 0.9))
+    optimizer_D = optim.Adam(discriminator.parameters(), lr=lr, betas=(0.5, 0.9))
 
     # Training loop
     for epoch in range(epochs):
@@ -161,19 +166,19 @@ def train_model():
 
             # Train Discriminator
             optimizer_D.zero_grad()
-            z = torch.randn(batch_size_now, 100, 1, 1, device=device)
+            z = torch.randn(batch_size_now, latent_dim, 1, 1, device=device)
             fake_imgs = generator(z).detach()
             real_validity = discriminator(real_imgs)
             fake_validity = discriminator(fake_imgs)
             gradient_penalty = compute_gradient_penalty(discriminator, real_imgs.data, fake_imgs.data)
-            loss_D = -torch.mean(real_validity) + torch.mean(fake_validity) + 10 * gradient_penalty
+            loss_D = -torch.mean(real_validity) + torch.mean(fake_validity) + lambda_gp * gradient_penalty
             loss_D.backward()
             optimizer_D.step()
 
             # Train Generator
-            if i % 5 == 0:
+            if i % n_critic == 0:
                 optimizer_G.zero_grad()
-                z = torch.randn(batch_size_now, 100, 1, 1, device=device)
+                z = torch.randn(batch_size_now, latent_dim, 1, 1, device=device)
                 gen_imgs = generator(z)
                 loss_G = -torch.mean(discriminator(gen_imgs))
                 loss_G.backward()
@@ -183,7 +188,7 @@ def train_model():
 
         # Save generated samples every 10 epochs
         if epoch % 10 == 0:
-            z = torch.randn(16, 100, 1, 1, device=device)  # Generate 16 samples
+            z = torch.randn(16, latent_dim, 1, 1, device=device)  # Generate 16 samples
             sample_imgs = generator(z).detach().cpu()
             grid = torchvision.utils.make_grid(sample_imgs, normalize=True, nrow=4)
             save_path = os.path.join(samples_folder, f'samples_epoch_{epoch}.png')
