@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 
 	"github.com/Kami0rn/ProjectCPE/go-backend/blockchain"
@@ -17,6 +18,10 @@ func init() {
 }
 
 func main() {
+	// Add a flag for the port
+	port := flag.String("port", "8080", "Port to run the server on")
+	flag.Parse()
+
 	config.LoadEnv()
 	database.ConnectDB()
 
@@ -25,7 +30,7 @@ func main() {
 
 	// Start the Gin HTTP server
 	r := routes.SetupRouter()
-	if err := r.Run(":8080"); err != nil {
+	if err := r.Run(":" + *port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }

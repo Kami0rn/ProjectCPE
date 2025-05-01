@@ -3,13 +3,18 @@ package handlers
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"io"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
+	"log"
+
 	"github.com/Kami0rn/ProjectCPE/go-backend/blockchain"
+	"github.com/Kami0rn/ProjectCPE/go-backend/database"
+	"github.com/Kami0rn/ProjectCPE/go-backend/models"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 )
@@ -172,6 +177,21 @@ func MineBlock(c *gin.Context) {
 	blockchain.AddBlock(newBlock)
 	pendingTransactions = nil
 
+	// Broadcast the new block to peers
+	blockchain.BroadcastBlock(newBlock)
+
+	// Save the model information in the database
+	model := models.Model{
+		Name:      modelName,
+		CreatedBy: username,
+		CreatedAt: time.Now(),
+		Hash:      newBlock.Hash,
+	}
+	if err := database.DB.Create(&model).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save model to database"})
+		return
+	}
+
 	c.JSON(http.StatusCreated, newBlock)
 }
 
@@ -221,5 +241,62 @@ func CheckImage(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"trained": false,
 		})
+	}
+}
+
+func ReceiveBlock(c *gin.Context) {
+	var block blockchain.Block
+	if err := c.ShouldBindJSON(&block); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid block data"})
+		return
+	}
+
+	// Validate the block
+	lastBlock := blockchain.Blockchain[len(blockchain.Blockchain)-1]
+	if !blockchain.IsBlockValid(block, lastBlock) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid block"})
+		return
+	}
+
+	// Add the block to the blockchain
+	blockchain.AddBlock(block)
+	c.JSON(http.StatusOK, gin.H{"message": "Block added successfully"})
+}
+
+func AddPeer(c *gin.Context) {
+	var request struct {
+		Peer string `json:"peer" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid peer data"})
+		return
+	}
+
+	blockchain.AddPeer(request.Peer)
+	c.JSON(http.StatusOK, gin.H{"message": "Peer added successfully"})
+}
+
+func SynchronizeBlockchain() {
+	peers := blockchain.GetPeers()
+	for _, peer := range peers {
+		resp, err := http.Get("http://" + peer + "/api/chain")
+		if err != nil {
+			log.Printf("Failed to fetch chain from peer %s: %v", peer, err)
+			continue
+		}
+		defer resp.Body.Close()
+
+		var response struct {
+			Chain []blockchain.Block `json:"chain"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+			log.Printf("Failed to decode chain from peer %s: %v", peer, err)
+			continue
+		}
+
+		// Replace the current blockchain if the peer's chain is longer
+		if len(response.Chain) > len(blockchain.Blockchain) {
+			blockchain.Blockchain = response.Chain
+		}
 	}
 }
