@@ -8,13 +8,16 @@ import torchvision
 import torch.nn as nn
 import hashlib
 import torch.optim as optim
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from werkzeug.utils import secure_filename
+import io
+from flask_cors import CORS
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Flask app initialization
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
 UPLOAD_FOLDER = 'uploaded_images'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -219,6 +222,56 @@ def generate_ai_proof(generator):
     img = generated_img.squeeze(0).permute(1, 2, 0).numpy()  # Convert to HxWxC
     img_hash = hashlib.sha256(img.tobytes()).hexdigest()  # Create a SHA-256 hash for proof
     return img_hash
+
+@app.route('/generate', methods=['POST'])
+def generate_image():
+    try:
+        username = request.form.get('username')
+        model_name = request.form.get('model_name')
+
+        if not username or not model_name:
+            return jsonify({"error": "username and model_name are required"}), 400
+
+        # Path to the generator model
+        generator_path = os.path.join('user_data', username, model_name, 'saved_models', 'generator.pth')
+        if not os.path.exists(generator_path):
+            return jsonify({"error": f"Generator model not found at {generator_path}"}), 404
+
+        # Load the generator model
+        latent_dim = 100  # Ensure this matches the latent_dim used during training
+        generator = DCGANGenerator(latent_dim=latent_dim).to(device)
+        generator.load_state_dict(torch.load(generator_path, map_location=device))
+        generator.eval()
+
+        # Generate a random latent vector
+        z = torch.randn(1, latent_dim, 1, 1, device=device)
+
+        # Generate an image
+        with torch.no_grad():
+            generated_img = generator(z).detach().cpu()
+
+        # Debugging: Log the shape of the generated image
+        print(f"Generated image shape: {generated_img.shape}")
+
+        # Convert the generated image to a format suitable for returning
+        img = generated_img.squeeze(0).permute(1, 2, 0).numpy()  # Convert to HxWxC
+        img = ((img + 1) * 127.5).astype('uint8')  # Denormalize to [0, 255]
+        img = Image.fromarray(img)
+
+        # Save the image to an in-memory buffer
+        img_buffer = io.BytesIO()
+        img.save(img_buffer, format='PNG')
+        img_buffer.seek(0)
+
+        # Debugging: Log the size of the generated image
+        print(f"Generated image size: {len(img_buffer.getvalue())} bytes")
+
+        # Return the image as a binary response
+        return send_file(img_buffer, mimetype='image/png', as_attachment=False)
+
+    except Exception as e:
+        print(f"Error generating image: {e}")
+        return jsonify({"error": str(e)}), 500
 
 # -------------------------------
 #   Gradient Penalty

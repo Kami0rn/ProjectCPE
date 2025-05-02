@@ -47,6 +47,7 @@ func SetupRouter() *gin.Engine {
 		api.GET("/me", controllers.Me)
 		api.POST("/check-image", handlers.CheckImage) // New endpoint
 		api.POST("/add-peer", handlers.AddPeer)
+		api.GET("/generate-image", handlers.GenerateImageHandler)
 
 	}
 
