@@ -27,34 +27,36 @@ func CheckPasswordHash(password, hash string) bool {
 }
 
 func GenerateToken(user models.User) (string, error) {
-    // ตรวจสอบว่าค่า JWT_SECRET มีหรือไม่
-    secretKey := os.Getenv("JWT_SECRET")
-    if secretKey == "" {
-        log.Println("Warning: JWT_SECRET environment variable not set, using default")
-        secretKey = "default_secret_key" // ค่า default (ใช้เฉพาะการพัฒนา)
-    }
-    
-    claims := jwt.MapClaims{
-        "user_id":  user.ID,
-        "username": user.Username,
-        "exp":      time.Now().Add(time.Hour * 72).Unix(),
-    }
+	// ตรวจสอบว่าค่า JWT_SECRET มีหรือไม่
+	secretKey := os.Getenv("JWT_SECRET")
+	if secretKey == "" {
+		log.Println("Warning: JWT_SECRET environment variable not set, using default")
+		secretKey = "default_secret_key" // ค่า default (ใช้เฉพาะการพัฒนา)
+	}
 
-    token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-    tokenString, err := token.SignedString([]byte(secretKey))
-    if err != nil {
-        log.Println("Error signing token:", err)
-        return "", err
-    }
-    log.Println("Generated token:", tokenString)
-    log.Println("JWT_SECRET used for generation:", secretKey)
-    return tokenString, nil
+	claims := jwt.MapClaims{
+		"user_id":  user.ID,
+		"username": user.Username,
+		"email":    user.Email, // Include email in the token claims
+		"exp":      time.Now().Add(time.Hour * 72).Unix(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString([]byte(secretKey))
+	if err != nil {
+		log.Println("Error signing token:", err)
+		return "", err
+	}
+	log.Println("Generated token:", tokenString)
+	log.Println("JWT_SECRET used for generation:", secretKey)
+	return tokenString, nil
 }
 
 func Register(c *gin.Context) {
 	var input struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
+		Email    string `json:"email"`
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -68,7 +70,7 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	user := models.User{Username: input.Username, PasswordHash: hash}
+	user := models.User{Username: input.Username, PasswordHash: hash, Email: input.Email}
 	if err := database.DB.Create(&user).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Username already exists"})
 		return

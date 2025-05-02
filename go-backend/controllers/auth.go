@@ -15,8 +15,11 @@ func Me(c *gin.Context) {
 
 	username := c.GetString("username")
 
+	email := c.GetString("email")
+
 	c.JSON(http.StatusOK, gin.H{
 		"user_id":  userID,
 		"username": username,
+		"email":    email,
 	})
 }

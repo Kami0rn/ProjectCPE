@@ -51,6 +51,7 @@ func JWTAuthMiddleware() gin.HandlerFunc {
             log.Println("Token claims:", claims)
             c.Set("user_id", claims["user_id"])
             c.Set("username", claims["username"])
+            c.Set("email", claims["email"])
         } else {
             log.Println("Invalid token claims")
             c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
