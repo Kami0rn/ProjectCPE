@@ -51,6 +51,7 @@ func SetupRouter() *gin.Engine {
 
 	}
 
+	r.GET("/models", handlers.GetAllModels)
 	r.POST("/api/receive-block", handlers.ReceiveBlock)
 
 	return r
