@@ -2,14 +2,25 @@
 
 import React, { useEffect, useState } from "react";
 import Navbar from "@/components/Navbar"; // Import the Navbar component
+import { useRouter } from "next/navigation";
+
+interface Model {
+  id: number;
+  name: string;
+  created_by: string;
+  created_at: string;
+  hash: string;
+}
 
 function Dashboard() {
-  const [userData, setUserData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [userData, setUserData] = useState<any>(null); // Store user data
+  const [models, setModels] = useState<Model[]>([]); // Store all models
+  const [loading, setLoading] = useState(true); // Loading state
+  const [error, setError] = useState(""); // Error state
+  const router = useRouter();
 
   useEffect(() => {
-    const fetchUserData = async () => {
+    const fetchUserDataAndModels = async () => {
       try {
         const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
         if (!token) {
@@ -18,20 +29,44 @@ function Dashboard() {
           return;
         }
 
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/me`, {
+        // Fetch user data
+        const userResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/me`, {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
 
-        if (response.ok) {
-          const data = await response.json();
-          setUserData(data);
-        } else {
-          const errorData = await response.json();
+        if (!userResponse.ok) {
+          const errorData = await userResponse.json();
           setError(errorData.error || "Failed to fetch user data.");
+          setLoading(false);
+          return;
         }
+
+        const userData = await userResponse.json();
+        setUserData(userData);
+
+        // Fetch all models
+        const modelsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/models`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!modelsResponse.ok) {
+          const errorData = await modelsResponse.json();
+          setError(errorData.error || "Failed to fetch models.");
+          setLoading(false);
+          return;
+        }
+
+        const modelsData = await modelsResponse.json();
+        const userModels = modelsData.models.filter(
+          (model: Model) => model.created_by === userData.username
+        ); // Filter models created by the logged-in user
+        setModels(userModels);
       } catch (err) {
         setError("An unexpected error occurred.");
       } finally {
@@ -39,8 +74,14 @@ function Dashboard() {
       }
     };
 
-    fetchUserData();
+    fetchUserDataAndModels();
   }, []);
+
+  const handleModelClick = (modelName: string) => {
+    if (userData?.username) {
+      router.push(`/generate/${userData.username}/${modelName}`);
+    }
+  };
 
   if (loading) {
     return (
@@ -63,19 +104,49 @@ function Dashboard() {
   return (
     <>
       <Navbar />
-      <div className="min-h-screen bg-[#0F0F0F] text-[#FFFFFF] flex flex-col items-center justify-center p-4">
-        <div className="bg-[#1E1E1E] p-6 rounded-lg shadow-lg w-full max-w-md text-center">
-          {/* User "Image" */}
-          <div className="w-24 h-24 bg-[#00FFF7] text-[#0F0F0F] rounded-full flex items-center justify-center text-4xl font-bold mx-auto mb-4">
-            {userData?.username?.[0]?.toUpperCase() || "?"}
+      <div className="min-h-screen bg-[#0F0F0F] text-[#FFFFFF] flex flex-col p-4">
+        <div className="flex flex-col md:flex-row gap-6 w-full max-w-7xl mx-auto">
+          {/* Left: User Profile */}
+          <div className="w-full md:w-1/3 bg-[#1E1E1E] p-6 rounded-lg shadow-lg">
+            <h2 className="text-2xl font-bold text-[#00FFF7] mb-4">User Profile</h2>
+            {userData ? (
+              <div className="space-y-4">
+                <p>
+                  <strong>Username:</strong> {userData.username}
+                </p>
+                <p>
+                  <strong>Email:</strong> {userData.email}
+                </p>
+                <p>
+                  <strong>Joined:</strong> {new Date(userData.created_at).toLocaleString()}
+                </p>
+              </div>
+            ) : (
+              <p className="text-[#CCCCCC]">No user data available.</p>
+            )}
           </div>
 
-          {/* User Info */}
-          <h1 className="text-2xl font-bold mb-2">{userData?.username || "Unknown User"}</h1>
-          <p className="text-[#CCCCCC] mb-4">{userData?.email || "No email available"}</p>
-
-          {/* Additional Info */}
-          <p className="text-sm text-[#CCCCCC]">User ID: {userData?.user_id || "N/A"}</p>
+          {/* Right: AI Dashboard */}
+          <div className="w-full md:w-2/3 bg-[#1E1E1E] p-6 rounded-lg shadow-lg">
+            <h2 className="text-2xl font-bold text-[#00FFF7] mb-4">My AI Models</h2>
+            {models.length === 0 ? (
+              <p className="text-center text-[#CCCCCC]">No models found.</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-4">
+                {models.map((model) => (
+                  <div
+                    key={model.id}
+                    className="p-4 bg-[#2E2E2E] rounded-lg shadow-lg hover:bg-[#3E3E3E] cursor-pointer transition"
+                    onClick={() => handleModelClick(model.name)}
+                  >
+                    <h3 className="text-xl font-bold text-[#00FFF7]">{model.name}</h3>
+                    <p className="text-sm text-[#CCCCCC]">Created at: {new Date(model.created_at).toLocaleString()}</p>
+                    <p className="text-xs text-[#AAAAAA] mt-2">Hash: {model.hash}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </>

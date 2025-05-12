@@ -66,18 +66,18 @@ export default function Navbar() {
         <h1 className="text-2xl font-bold text-[#00FFF7]">Blockchain-AI</h1>
         <ul className="flex gap-6">
           <li>
-            <Link href="/" className="hover:text-[#00FFF7] transition">
-              Home
+            <Link href="/generate/select_model" className="hover:text-[#00FFF7] transition">
+              Use AI
             </Link>
           </li>
           <li>
-            <Link href="/docs" className="hover:text-[#00FFF7] transition">
-              Documentation
+            <Link href="/check" className="hover:text-[#00FFF7] transition">
+              Check Image
             </Link>
           </li>
           <li>
             <Link href="/train" className="hover:text-[#00FFF7] transition">
-              Demo
+              Train
             </Link>
           </li>
         </ul>

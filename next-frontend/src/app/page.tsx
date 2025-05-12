@@ -17,7 +17,7 @@ export default function Home() {
       <main className="flex flex-col items-center gap-12 w-full max-w-5xl mx-auto">
         <section className="flex flex-col sm:flex-row items-center gap-8 bg-[#1E1E1E] p-6 rounded-lg">
           <Image
-            src="/blockchain.svg"
+            src="/blockchain.png"
             alt="Blockchain illustration"
             width={200}
             height={200}
@@ -33,7 +33,7 @@ export default function Home() {
 
         <section className="flex flex-col sm:flex-row items-center gap-8 bg-[#1E1E1E] p-6 rounded-lg">
           <Image
-            src="/ai.svg"
+            src="/artificial-intelligence.png"
             alt="AI illustration"
             width={200}
             height={200}
