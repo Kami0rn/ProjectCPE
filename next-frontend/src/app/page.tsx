@@ -6,10 +6,10 @@ export default function Home() {
     <div className="min-h-screen flex flex-col items-center justify-between p-0 sm:p-0 bg-[#0F0F0F] text-[#FFFFFF]">
       <Navbar />
       <header className="w-full max-w-5xl mx-auto text-center">
-        <h1 className="text-4xl sm:text-5xl font-bold mb-4 mt-4 text-[#00FFF7] ">
+        <h1 className="text-4xl sm:text-5xl font-bold mb-4 mt-15  text-[#00FFF7] ">
           Blockchain-Powered AI Training for Image Generation
         </h1>
-        <p className="text-lg sm:text-xl text-[#CCCCCC]">
+        <p className="text-lg sm:text-xl m-15 text-[#CCCCCC]">
           A cutting-edge prototype combining blockchain technology and AI to revolutionize image generation.
         </p>
       </header>

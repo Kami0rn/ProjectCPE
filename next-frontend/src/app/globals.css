@@ -24,3 +24,29 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Scrollbar for WebKit-based browsers */
+::-webkit-scrollbar {
+  width: 8px; /* Width of the scrollbar */
+  height: 8px; /* Height of the scrollbar for horizontal scrolling */
+}
+
+::-webkit-scrollbar-track {
+  background: #1E1E1E; /* Background of the scrollbar track */
+  border-radius: 4px; /* Rounded corners */
+}
+
+::-webkit-scrollbar-thumb {
+  background: #00FFF7; /* Color of the scrollbar thumb */
+  border-radius: 4px; /* Rounded corners */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #00E6DF; /* Color when hovering over the scrollbar thumb */
+}
+
+/* Scrollbar for Firefox */
+* {
+  scrollbar-width: thin; /* Makes the scrollbar thinner */
+  scrollbar-color: #00FFF7 #1E1E1E; /* Thumb color and track color */
+}
