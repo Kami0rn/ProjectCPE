@@ -4,5 +4,6 @@ Combine/ai/uploaded_images
 Combine/ai/user_data
 
 go-backend/user_data
+go-backend/.env
 next-frontend/node_modules/.
 node_modules
