@@ -7,3 +7,5 @@ go-backend/user_data
 go-backend/.env
 next-frontend/node_modules/.
 node_modules
+go-backend/.env
+go-backend/.env

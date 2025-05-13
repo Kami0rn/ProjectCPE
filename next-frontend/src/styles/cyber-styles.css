@@ -1,0 +1,61 @@
+/* Background Animation */
+.cyber-bg {
+  background: linear-gradient(135deg, #0F0F0F, #1E1E1E);
+  animation: cyber-bg-animation 10s infinite alternate;
+}
+
+@keyframes cyber-bg-animation {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Neon Text (Reduced Glow) */
+.neon-text {
+  
+}
+
+/* Neon Text with #FF00C8 (Reduced Glow) */
+.neon-text-pink {
+  
+}
+
+/* Glow Text (Reduced Glow) */
+.glow-text {
+  
+}
+
+/* Cyber Card */
+.cyber-card {
+  box-shadow: 0 0 6px #00FFF7, 0 0 12px #00FFF7;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.cyber-card:hover {
+  transform: scale(1.03); /* Reduced scaling */
+  box-shadow: 0 0 12px #FF00C8, 0 0 24px #FF00C8;
+}
+
+/* Neon Button */
+.neon-button {
+  box-shadow: 0 0 6px #00FFF7, 0 0 12px #00FFF7;
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.neon-button:hover {
+  transform: translateY(-2px); /* Reduced lift */
+  box-shadow: 0 0 12px #FF00C8, 0 0 24px #FF00C8;
+}
+
+/* Cyber Image */
+.cyber-image {
+  filter: drop-shadow(0 0 3px #00FFF7);
+  transition: filter 0.3s ease;
+}
+
+.cyber-image:hover {
+  filter: drop-shadow(0 0 12px #FF00C8);
+}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Navbar from "@/components/Navbar";
 
 interface Model {
   id: number;
@@ -43,6 +44,7 @@ export default function SelectModelPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#0F0F0F] text-[#FFFFFF]">
+      <Navbar />
       <div className="w-full max-w-5xl mx-auto p-6">
         <h1 className="text-4xl font-bold mb-6 text-[#00FFF7] text-center">Select a Model</h1>
         {loading ? (
