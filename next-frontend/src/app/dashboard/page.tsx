@@ -107,7 +107,7 @@ function Dashboard() {
       <div className="min-h-screen bg-[#0F0F0F] text-[#FFFFFF] flex flex-col p-4">
         <div className="flex flex-col md:flex-row gap-6 w-full max-w-7xl mx-auto">
           {/* Left: User Profile */}
-          <div className="w-full md:w-1/3 bg-[#1E1E1E] p-6 rounded-lg shadow-lg">
+          <div className="w-full md:w-1/3 bg-[#1E1E1E] p-6 rounded-lg shadow-lg max-h-50">
             <h2 className="text-2xl font-bold text-[#00FFF7] mb-4">User Profile</h2>
             {userData ? (
               <div className="space-y-4">

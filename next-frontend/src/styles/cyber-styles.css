@@ -52,7 +52,7 @@
 
 /* Cyber Image */
 .cyber-image {
-  filter: drop-shadow(0 0 3px #00FFF7);
+  filter: drop-shadow(0 0 0px #00FFF7);
   transition: filter 0.3s ease;
 }
 

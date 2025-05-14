@@ -47,7 +47,7 @@ export default function CheckImagePage() {
       const formData = new FormData();
       formData.append("image", file); // Append the file to the form-data
 
-      const response = await fetch("http://localhost:8081/api/check-image", {
+      const response = await fetch("http://localhost:8080/api/check-image", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`, // Include the token in the Authorization header
@@ -89,12 +89,12 @@ export default function CheckImagePage() {
               type="file"
               accept="image/*"
               onChange={handleFileChange}
-              className="file-input file-input-bordered w-full text-[#CCCCCC]"
+              className="mb-4 text-[#FFFFFF] file:bg-[#00FFF7] file:text-[#0F0F0F] file:rounded-lg file:px-4 file:py-2 file:cursor-pointer"
             />
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 bg-[#00FFF7] text-[#0F0F0F] rounded-lg hover:bg-[#00E6DF] transition disabled:opacity-50"
+              className="px-4 py-2 bg-[#00FFF7]  text-[#0F0F0F] rounded-lg hover:bg-[#00E6DF] transition disabled:opacity-50"
             >
               {loading ? "Checking..." : "Check Image"}
             </button>

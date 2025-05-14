@@ -21,11 +21,12 @@ export default function GeneratePage() {
     const generatedImages: string[] = [];
 
     try {
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 9; i++) {
         // Create form data
         const formData = new FormData();
         formData.append("username", username);
         formData.append("model_name", model_name);
+        formData.append("block_hash", `/${username}/${model_name}`);
 
         const response = await fetch("http://127.0.0.1:5000/generate", {
           method: "POST",
@@ -63,29 +64,38 @@ export default function GeneratePage() {
 
       {/* Main Content */}
       <div className="flex flex-col items-center justify-center flex-grow">
-        <div className="w-full max-w-5xl p-6 bg-[#1E1E1E] rounded-lg shadow-lg mt-2.5 mb-2.5">
+        <div className="w-full max-w-5xl p-6 bg-[#1E1E1E] rounded-lg shadow-lg mt-2.5 mb-2.5 max-w-xl">
           <h1 className="text-4xl font-bold mb-6 text-[#00FFF7] text-center">Generate Images</h1>
           <p className="text-lg text-center text-[#CCCCCC] mb-4">
             <strong>Username:</strong> {username || "N/A"}
           </p>
-          <p className="text-lg text-center text-[#CCCCCC] mb-6">
-            <strong>Model Name:</strong> {model_name || "N/A"}
+          <p className="text-lg text-center text-[#CCCCCC] mb-6 flex items-center justify-center gap-3">
+            {/* Circle icon with first letter of model name */}
+            <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-[#00FFF7] text-[#0F0F0F] font-bold text-2xl shadow-md">
+              {model_name ? model_name[0].toUpperCase() : "?"}
+            </span>
+            <span>
+              <strong>Model Name:</strong> {model_name || "N/A"}
+            </span>
           </p>
-          <button
-            onClick={fetchImages}
-            disabled={loading}
-            className="w-full sm:w-auto px-6 py-3 bg-[#00FFF7] text-[#0F0F0F] rounded-lg hover:bg-[#00E6DF] transition disabled:opacity-50"
-          >
-            {loading ? "Generating..." : "Generate 10 Images"}
-          </button>
+          {/* Center the button */}
+          <div className="flex justify-center w-full mb-4">
+            <button
+              onClick={fetchImages}
+              disabled={loading}
+              className="px-6 py-3 bg-[#00FFF7] text-[#0F0F0F] rounded-lg hover:bg-[#00E6DF] transition disabled:opacity-50"
+            >
+              {loading ? "Generating..." : "Generate 9 Images"}
+            </button>
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mt-8">
             {images.map((url, index) => (
               <div key={index} className="relative bg-[#2E2E2E] p-4 rounded-lg">
                 <img
                   src={url}
                   alt={`Generated ${index + 1}`}
-                  className="w-32 h-32 object-cover rounded cursor-pointer" // Smaller size
-                  onClick={() => downloadImage(url)} // Download on click
+                  className="w-32 h-32 object-cover rounded cursor-pointer"
+                  onClick={() => downloadImage(url)}
                 />
                 <p className="text-center text-sm mt-2 text-[#CCCCCC]">Image {index + 1}</p>
               </div>

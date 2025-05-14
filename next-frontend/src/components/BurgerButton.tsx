@@ -55,6 +55,14 @@ function BurgerButton() {
           </li>
           <li>
             <Link
+              href="/check/model"
+              className="block px-4 py-2 rounded-lg hover:bg-[#00FFF7] hover:text-[#0F0F0F] transition"
+            >
+              Track Image
+            </Link>
+          </li>
+          <li>
+            <Link
               href="/check/display"
               className="block px-4 py-2 rounded-lg hover:bg-[#00FFF7] hover:text-[#0F0F0F] transition"
             >
