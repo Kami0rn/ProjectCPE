@@ -12,6 +12,7 @@ from flask import Flask, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 import io
 from flask_cors import CORS
+from stegano import lsb  # Import the stegano library for steganography
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -226,11 +227,13 @@ def generate_ai_proof(generator):
 @app.route('/generate', methods=['POST'])
 def generate_image():
     try:
+        # Extract parameters from the request
         username = request.form.get('username')
         model_name = request.form.get('model_name')
+        block_hash = request.form.get('block_hash')  # Get the block hash from the request
 
-        if not username or not model_name:
-            return jsonify({"error": "username and model_name are required"}), 400
+        if not username or not model_name or not block_hash:
+            return jsonify({"error": "username, model_name, and block_hash are required"}), 400
 
         # Path to the generator model
         generator_path = os.path.join('user_data', username, model_name, 'saved_models', 'generator.pth')
@@ -250,28 +253,73 @@ def generate_image():
         with torch.no_grad():
             generated_img = generator(z).detach().cpu()
 
-        # Debugging: Log the shape of the generated image
-        print(f"Generated image shape: {generated_img.shape}")
-
-        # Convert the generated image to a format suitable for returning
+        # Convert the generated image to a format suitable for embedding
         img = generated_img.squeeze(0).permute(1, 2, 0).numpy()  # Convert to HxWxC
         img = ((img + 1) * 127.5).astype('uint8')  # Denormalize to [0, 255]
         img = Image.fromarray(img)
 
-        # Save the image to an in-memory buffer
-        img_buffer = io.BytesIO()
-        img.save(img_buffer, format='PNG')
-        img_buffer.seek(0)
+        # Embed the block hash into the image using LSB steganography
+        output_path = os.path.join(SAMPLES_FOLDER, f"{model_name}_generated_with_hash.png")
+        secret_image = lsb.hide(img, block_hash)
+        secret_image.save(output_path)
 
-        # Debugging: Log the size of the generated image
-        print(f"Generated image size: {len(img_buffer.getvalue())} bytes")
+        # Return the image with the embedded block hash
+        with open(output_path, "rb") as f:
+            image_data = f.read()
 
-        # Return the image as a binary response
-        return send_file(img_buffer, mimetype='image/png', as_attachment=False)
+        return send_file(
+            io.BytesIO(image_data),
+            mimetype='image/png',
+            as_attachment=False
+        )
 
     except Exception as e:
         print(f"Error generating image: {e}")
         return jsonify({"error": str(e)}), 500
+
+@app.route('/extract', methods=['POST'])
+def extract_block_hash():
+    try:
+        # Check if an image file is provided
+        if 'image' not in request.files:
+            return jsonify({"error": "No image file provided"}), 400
+
+        # Save the uploaded image temporarily
+        image_file = request.files['image']
+        temp_path = os.path.join(UPLOAD_FOLDER, secure_filename(image_file.filename))
+        image_file.save(temp_path)
+
+        # Extract the block hash from the image using LSB steganography
+        try:
+            extracted_hash = lsb.reveal(temp_path)
+        except Exception as e:
+            return jsonify({"error": f"Failed to extract block hash: {str(e)}"}), 500
+
+        # Return the extracted block hash as a JSON response
+        response = {
+            "message": "Block hash extracted successfully",
+            "block_hash": extracted_hash
+        }
+
+        # Optionally, include the uploaded image in the response
+        if request.args.get("include_image", "false").lower() == "true":
+            with open(temp_path, "rb") as f:
+                image_data = f.read()
+
+            return send_file(
+                io.BytesIO(image_data),
+                mimetype='image/png',
+                as_attachment=False,
+                download_name="uploaded_image.png"
+            ), 200, {"X-Block-Hash": extracted_hash}
+
+        # Default: Return only the block hash
+        return jsonify(response)
+
+    finally:
+        # Clean up the temporary file
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
 # -------------------------------
 #   Gradient Penalty
