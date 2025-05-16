@@ -2,15 +2,56 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import Navbar from "@/components/Navbar"; // Import your Navbar component
+import Navbar from "@/components/Navbar";
 
 export default function GeneratePage() {
   const params = useParams();
   const username = Array.isArray(params?.username) ? params.username.join("") : params?.username;
   const model_name = Array.isArray(params?.model_name) ? params.model_name.join("") : params?.model_name;
-  const [images, setImages] = useState<string[]>([]); // Store multiple image URLs
+
+  const [model, setModel] = useState<any>(null);
+  const [sampleImages, setSampleImages] = useState<string[]>([]);
+  const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Fetch model details and sample images
+  useEffect(() => {
+    const fetchModelDetails = async () => {
+      if (!username || !model_name) {
+        console.error("Username or model name is missing.");
+        return;
+      }
+
+      try {
+        const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+        const response = await fetch("http://127.0.0.1:8080/api/model", {
+          method: "POST", // <-- Change to POST
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: token ? `Bearer ${token}` : "",
+          },
+          body: JSON.stringify({
+            username: username,
+            model_name: model_name,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch model details");
+        }
+
+        const data = await response.json();
+        setModel(data.model);
+        setSampleImages(data.sample_images || []);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    fetchModelDetails();
+  }, [username, model_name]);
+
+  // Fetch generated images
   const fetchImages = async () => {
     if (!username || !model_name) {
       console.error("Username or model name is missing.");
@@ -18,11 +59,10 @@ export default function GeneratePage() {
     }
 
     setLoading(true);
-    const generatedImages: string[] = [];
+    const images: string[] = [];
 
     try {
       for (let i = 0; i < 9; i++) {
-        // Create form data
         const formData = new FormData();
         formData.append("username", username);
         formData.append("model_name", model_name);
@@ -30,7 +70,7 @@ export default function GeneratePage() {
 
         const response = await fetch("http://127.0.0.1:5000/generate", {
           method: "POST",
-          body: formData, // Send form data
+          body: formData,
         });
 
         if (!response.ok) {
@@ -39,10 +79,10 @@ export default function GeneratePage() {
 
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
-        generatedImages.push(url); // Add the generated image URL to the array
+        images.push(url);
       }
 
-      setImages(generatedImages); // Update state with all generated images
+      setGeneratedImages(images); // Update state with all generated images
     } catch (error) {
       console.error(error);
     } finally {
@@ -78,7 +118,38 @@ export default function GeneratePage() {
               <strong>Model Name:</strong> {model_name || "N/A"}
             </span>
           </p>
-          {/* Center the button */}
+
+          {/* Model Details */}
+          {model && (
+            <div className="text-center text-[#CCCCCC] mb-6">
+              <p>
+                <strong>Model ID:</strong> {model.id}
+              </p>
+              <p>
+                <strong>Created By:</strong> {model.created_by}
+              </p>
+              <p>
+                <strong>Hash:</strong> {model.hash}
+              </p>
+            </div>
+          )}
+
+          {/* Sample Images */}
+          <p>
+            <strong >Sample Datasets</strong>
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            {sampleImages.map((base64Image, index) => (
+              <img
+                key={index}
+                src={`data:image/jpeg;base64,${base64Image}`}
+                alt={`Sample ${index + 1}`}
+                className="w-32 h-32 object-cover rounded shadow-md"
+              />
+            ))}
+          </div>
+
+          {/* Generate Button */}
           <div className="flex justify-center w-full mb-4">
             <button
               onClick={fetchImages}
@@ -88,8 +159,10 @@ export default function GeneratePage() {
               {loading ? "Generating..." : "Generate 9 Images"}
             </button>
           </div>
+
+          {/* Generated Images */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mt-8">
-            {images.map((url, index) => (
+            {generatedImages.map((url, index) => (
               <div key={index} className="relative bg-[#2E2E2E] p-4 rounded-lg">
                 <img
                   src={url}
