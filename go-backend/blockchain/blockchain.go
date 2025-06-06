@@ -30,6 +30,6 @@ func GenerateBlock(prevBlock Block, transactions []Transaction, proof string) Bl
 		Proof:        proof,
 	}
 
-	newBlock.Hash = CalculateHash(newBlock)
+	newBlock.Hash = CalculateHash(newBlock) 
 	return newBlock
 }

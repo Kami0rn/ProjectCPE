@@ -13,6 +13,8 @@ from werkzeug.utils import secure_filename
 import io
 from flask_cors import CORS
 from stegano import lsb  # Import the stegano library for steganography
+import pywt  # Add this import at the top
+import numpy as np  # Add this line near your other imports
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -31,7 +33,7 @@ MODELS_FOLDER = 'saved_models'
 os.makedirs(SAMPLES_FOLDER, exist_ok=True)
 os.makedirs(MODELS_FOLDER, exist_ok=True)
 
-# -------------------------------
+# ------------------------------- 
 #   DCGAN Generator
 # -------------------------------
 class DCGANGenerator(nn.Module):
@@ -224,6 +226,49 @@ def generate_ai_proof(generator):
     img_hash = hashlib.sha256(img.tobytes()).hexdigest()  # Create a SHA-256 hash for proof
     return img_hash
 
+# --- Wavelet Steganography Helpers ---
+def wavelet_hide(image: Image.Image, secret: str) -> Image.Image:
+    arr = np.array(image.convert('RGB'))
+    h, w, c = arr.shape
+    secret_bin = ''.join(f"{ord(ch):08b}" for ch in secret)
+    # Split secret bits into 3 nearly equal parts for R, G, B
+    split = len(secret_bin) // 3
+    bins = [secret_bin[:split], secret_bin[split:2*split], secret_bin[2*split:]]
+    arr_stego = np.zeros_like(arr)
+    for ch in range(3):
+        coeffs = pywt.dwt2(arr[..., ch], 'haar')
+        LL, (LH, HL, HH) = coeffs
+        flat_HH = HH.flatten()
+        bits = bins[ch]
+        if len(bits) > len(flat_HH):
+            raise ValueError("Secret too large to hide in image channel.")
+        for i, bit in enumerate(bits):
+            flat_HH[i] = (int(flat_HH[i]) & ~1) | int(bit)
+        HH = flat_HH.reshape(HH.shape)
+        coeffs_stego = LL, (LH, HL, HH)
+        arr_channel = pywt.idwt2(coeffs_stego, 'haar')
+        arr_stego[..., ch] = np.clip(arr_channel, 0, 255)
+    return Image.fromarray(arr_stego.astype('uint8'), 'RGB')
+
+def wavelet_reveal(image: Image.Image, secret_length: int) -> str:
+    arr = np.array(image.convert('RGB'))
+    total_bits = secret_length * 8
+    split = total_bits // 3
+    bins = []
+    for ch in range(3):
+        coeffs = pywt.dwt2(arr[..., ch], 'haar')
+        _, (_, _, HH) = coeffs
+        flat_HH = HH.flatten()
+        if ch < 2:
+            bits = [str(int(flat_HH[i]) & 1) for i in range(split)]
+        else:
+            bits = [str(int(flat_HH[i]) & 1) for i in range(total_bits - 2*split)]
+        bins.append(bits)
+    bits = bins[0] + bins[1] + bins[2]
+    chars = [chr(int(''.join(bits[i*8:(i+1)*8]), 2)) for i in range(secret_length)]
+    return ''.join(chars)
+# --- End Wavelet Helpers ---
+
 @app.route('/generate', methods=['POST'])
 def generate_image():
     try:
@@ -231,9 +276,13 @@ def generate_image():
         username = request.form.get('username')
         model_name = request.form.get('model_name')
         block_hash = request.form.get('block_hash')  # Get the block hash from the request
+        method = request.form.get('steg_method', 'lsb')  # 'lsb' or 'wavelet'
 
         if not username or not model_name or not block_hash:
             return jsonify({"error": "username, model_name, and block_hash are required"}), 400
+
+        # Print the secret to be embedded
+        print(f"[INFO] Embedding secret: '{block_hash}' using method: {method}")
 
         # Path to the generator model
         generator_path = os.path.join('user_data', username, model_name, 'saved_models', 'generator.pth')
@@ -260,8 +309,17 @@ def generate_image():
 
         # Embed the block hash into the image using LSB steganography
         output_path = os.path.join(SAMPLES_FOLDER, f"{model_name}_generated_with_hash.png")
-        secret_image = lsb.hide(img, block_hash)
-        secret_image.save(output_path)
+        if method == 'lsb':
+            secret_image = lsb.hide(img, block_hash)
+            secret_image.save(output_path)
+        elif method == 'wavelet':
+            # For demo, limit secret length to 32 chars (adjust as needed)
+            if len(block_hash) > 32:
+                return jsonify({"error": "Block hash too long for wavelet method"}), 400
+            secret_image = wavelet_hide(img, block_hash)
+            secret_image.save(output_path)
+        else:
+            return jsonify({"error": "Unknown steganography method"}), 400
 
         # Return the image with the embedded block hash
         with open(output_path, "rb") as f:
@@ -290,10 +348,16 @@ def extract_block_hash():
         image_file.save(temp_path)
 
         # Extract the block hash from the image using LSB steganography
-        try:
+        method = request.form.get('steg_method', 'lsb')  # 'lsb' or 'wavelet'
+
+        if method == 'lsb':
             extracted_hash = lsb.reveal(temp_path)
-        except Exception as e:
-            return jsonify({"error": f"Failed to extract block hash: {str(e)}"}), 500
+        elif method == 'wavelet':
+            # For demo, assume block_hash is 64 hex chars (SHA-256)
+            secret_length = int(request.form.get('secret_length', 15))  # Default to 32 if not provided
+            extracted_hash = wavelet_reveal(Image.open(temp_path), secret_length)
+        else:
+            return jsonify({"error": "Unknown steganography method"}), 400
 
         # Return the extracted block hash as a JSON response
         response = {
